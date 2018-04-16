@@ -131,7 +131,7 @@ setup(
     project_urls={  # Optional
         'Bug Reports': 'http://github.com/jkittley/RFM69/issues',
         'Source': 'http://github.com/jkittley/RFM69',
-        'Documentation': 'http://rfm69radio.readthedocs.io/',
+        'Documentation': 'http://rpi-rfm69.readthedocs.io/',
         'Tracker': 'http://github.com/jkittley/RFM69/issues',
     },
 )
