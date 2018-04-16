@@ -260,7 +260,7 @@ class Radio(object):
         """Get newly received packets.
 
         Returns:
-            RFM69.Packet: Packet objects containing received data and associated meta data.
+            list: Returns a list of RFM69.Packet objects.
         """
         # Create packet
         packets = list(self.packets)
