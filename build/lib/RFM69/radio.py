@@ -260,7 +260,7 @@ class Radio(object):
         """Get newly received packets.
 
         Returns:
-            RFM69.Packet: Packet objects containing received data and associated meta data.
+            list: Returns a list of RFM69.Packet objects.
         """
         # Create packet
         packets = list(self.packets)
@@ -468,8 +468,9 @@ class Radio(object):
                 payload_length = 66
 
             if not (self.promiscuousMode or target_id == self.address or target_id == RF69_BROADCAST_ADDR):
-                self._debug("IGNORE")
+                self._debug("Ignore Interrupt")
                 self.intLock = False
+                self.begin_receive()
                 return
 
             data_length = payload_length - 3
