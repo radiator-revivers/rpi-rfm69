@@ -168,6 +168,13 @@ class Radio(object):
 
 
     def broadcast(self, buff = ""):
+        """Broadcast a message to network i.e. sends to node 255 with no ACK request.
+
+        Args:
+            buff (str): Message buffer to send 
+
+        """
+
         broadcastAddress = 255
         self.send(broadcastAddress, buff, require_ack=False)
 
