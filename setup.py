@@ -18,7 +18,7 @@ with open(path.join(here, 'README.md'), encoding='utf-8') as f:
 setup(
     name='rpi-rfm69',  # Required
     # https://packaging.python.org/en/latest/single_source_version.html
-    version='0.1.0a1',  # Required
+    version='0.2.0b',  # Required
     # https://packaging.python.org/specifications/core-metadata/#summary
     description='RFM69 Radio interface for the Raspberry Pi',  # Required
     # https://packaging.python.org/specifications/core-metadata/#description-optional
