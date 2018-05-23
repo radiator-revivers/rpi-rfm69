@@ -167,6 +167,17 @@ class Radio(object):
         self._sendFrame(toAddress, buff, requestACK, False)
 
 
+    def broadcast(self, buff = ""):
+        """Broadcast a message to network i.e. sends to node 255 with no ACK request.
+
+        Args:
+            buff (str): Message buffer to send 
+
+        """
+
+        broadcastAddress = 255
+        self.send(broadcastAddress, buff, require_ack=False)
+
     def send(self, toAddress, buff = "", **kwargs):
         """Send a message
         
@@ -176,22 +187,29 @@ class Radio(object):
         
         Keyword Args:
             attempts (int): Number of attempts
-            waitTime (int): Milliseconds to wait for acknowledgement
-
+            wait (int): Milliseconds to wait for acknowledgement
+            require_ack(bool): Require Acknowledgement. If Attempts > 1 this is auto set to True.
         Returns:
-            bool: If acknowledgement received
+            bool: If acknowledgement received or None is no acknowledgement requested
         
         """
 
         attempts = kwargs.get('attempts', 3)
-        wait_time = kwargs.get('waitTime', 50)
+        wait_time = kwargs.get('wait', 50)
+        require_ack = kwargs.get('require_ack', True)
+        if attempts > 1:
+            require_ack = True
 
         for _ in range(0, attempts):
-
             self._send(toAddress, buff, attempts>0 )
+
+            if not require_ack:
+                return None
 
             sentTime = time.time()
             while (time.time() - sentTime) * 1000 < wait_time:
+                self._debug("Waiting line 203")
+                time.sleep(.05)
                 if self._ACKReceived(toAddress):
                     return True
 
