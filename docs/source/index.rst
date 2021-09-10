@@ -40,9 +40,3 @@ The project is licensed under the GPL v3 license.
    example
    api
 
-Indices and tables
-------------------
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
