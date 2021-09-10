@@ -13,6 +13,8 @@ version_string=$(cat VERSION | tr -d '[:space:]')
 if [[ "$version_string" == *"$changelog_version"* ]]; then
     rm -rf dist
     python3 -m build
+    echo
+    echo "SUCCESS! Completed building $version_string"
 else
     echo
     echo "ERROR: VERSION=$version_string, but the changelog has only been updated to version $changelog_version"

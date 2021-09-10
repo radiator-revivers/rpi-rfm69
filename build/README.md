@@ -9,7 +9,11 @@ Part of these instructions are cribbed from [https://packaging.python.org/tutori
 . Make sure all the tests pass per the instructions at [```../tests/readme.md```](../tests/readme.md)
 . Push the branch to Github with ```git push --set-upstream origin VERSION``` where ```VERSION``` is the version number/name of the branch
 . Make sure the documentation for that version builds at [https://readthedocs.org/projects/rpi-rfm69/builds/](https://readthedocs.org/projects/rpi-rfm69/builds/)
+. Create a pull request, and then merge the version branch into main
+. Delete the version branch on Github
+. Checkout main
 . Do ```source build.sh``` in this directory to create a virtual environment and build the release files
 . Upload the new packages to pypi by doing ```python3 -m twine upload -u __token__ dist/*``` and entering your API token
+. Create a new tag for the release, using the contents of [```../CHANGELOG.md```](../CHANGELOG.md) as the description of the release, and uploading the files from ```dist``` as the binaries
 
 To clean up the build, just do ```source clean.sh```.
