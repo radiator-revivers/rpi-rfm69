@@ -664,7 +664,7 @@ RF_AGCTHRESH1_STEP1_31 = 0x1F
 RF_AGCTHRESH2_STEP2_0 = 0x00
 RF_AGCTHRESH2_STEP2_1 = 0x10
 RF_AGCTHRESH2_STEP2_2 = 0x20
-RF_AGCTHRESH2_STEP2_3 = 0x30  # XXX wrong -- Default
+RF_AGCTHRESH2_STEP2_3 = 0x30
 RF_AGCTHRESH2_STEP2_4 = 0x40
 RF_AGCTHRESH2_STEP2_5 = 0x50
 RF_AGCTHRESH2_STEP2_6 = 0x60
@@ -1084,7 +1084,9 @@ RF69_433MHZ = 43
 RF69_868MHZ = 86
 RF69_915MHZ = 91
 
-RF69_MAX_DATA_LEN = 61 # to take advantage of the built in AES/CRC we want to limit the frame size to the internal FIFO size (66 bytes - 3 bytes overhead)
+# to take advantage of the built in AES/CRC we want to limit the frame
+# size to the internal FIFO size (66 bytes - 3 bytes overhead)
+RF69_MAX_DATA_LEN = 61
 
 CSMA_LIMIT = -90 # upper RX signal sensitivity threshold in dBm for carrier sense access
 RF69_MODE_SLEEP = 0 # XTAL OFF
@@ -1093,8 +1095,9 @@ RF69_MODE_SYNTH	= 2 # PLL ON
 RF69_MODE_RX = 3 # RX MODE
 RF69_MODE_TX	= 4 # TX MODE
 
-COURSE_TEMP_COEF = -90 # puts the temperature reading in the ballpark, user can fine tune the returned value
-RF69_BROADCAST_ADDR = 255
+# puts the temperature reading in the ballpark, user can fine tune the returned value
+COURSE_TEMP_COEF = -90
+RF69_BROADCAST_ADDR = 0
 RF69_CSMA_LIMIT_MS = 1000
 RF69_CSMA_LIMIT_S = 1
 

@@ -6,6 +6,10 @@ __pycache__/
 *.DS_Store
 docs/build
 *.vscode
+\#*\#
+*~
+.coverage
+.\#*
 
 # Setuptools distribution folder.
 /dist/

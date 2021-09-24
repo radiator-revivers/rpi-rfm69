@@ -46,6 +46,8 @@
 #define RF69_IRQ_PIN  3
 #endif
 
+#define RUN_TEST(testName, delayTime) runTest(#testName, testName, delayTime) ? numPassed++ : numFailed++;
+
 
 RFM69 radio(RF69_SPI_CS, RF69_IRQ_PIN, false);
 
@@ -57,13 +59,13 @@ void setup() {
 #if defined(RF69_LISTENMODE_ENABLE)
   radio.listenModeEnd();
 #endif
-  radio.spyMode(true);
+
 #ifdef IS_RFM69HW_HCW
   radio.setHighPower(); //must include this only for RFM69HW/HCW!
 #endif
   Serial.println("Setup complete");
 #if defined(RF69_LISTENMODE_ENABLE)
-  Serial.println("Note: Tests will include listenModeSendBurst");
+  Serial.println("Note: Tests will include listen_mode_send_burst");
 #else
   Serial.println("Note: Skipping testing listenModeSendBurst since it's not set up");
 #endif
@@ -71,31 +73,103 @@ void setup() {
 }
 
 
+char* data = null;
+uint8_t datalen = 0;
+
+bool use_encryption = false;
+
 void loop() {
   Serial.println("Ready to begin tests");
-  // All test names are as named in test_radio.py
-  char* data = null;
-  uint8_t datalen = 0;
   bool success;
+  uint8_t numPassed = 0;
+  uint8_t numFailed = 0;
 
-  // test_transmit
-  Serial.println("----- test_transmit -----");
+  // test_radio.py
+  radio.encrypt("sampleEncryptKey");
+  // This is a hack since there's a bug regarding listen mode and encryption in the RFM69 library
+  use_encryption = true;
+
+  RUN_TEST(test_transmit, 0);
+  RUN_TEST(test_receive, 1000);
+  RUN_TEST(test_txrx, 0);
+#if defined(RF69_LISTENMODE_ENABLE)
+  RUN_TEST(test_listenModeSendBurst, 0);
+#endif
+
+  // test_radio_broadcast.py
+  RUN_TEST(test_broadcast_and_promiscuous_mode, 0);
+
+  // test_radio_threadsafe.py
+  radio.encrypt(0);
+  // This is a hack since there's a bug regarding listen mode and encryption in the RFM69 library
+  use_encryption = false;
+  RUN_TEST(test_transmit, 0);
+  RUN_TEST(test_receive, 1000);
+  RUN_TEST(test_txrx, 0);
+#if defined(RF69_LISTENMODE_ENABLE)
+  RUN_TEST(test_listenModeSendBurst, 0);
+#endif
+
+
+  Serial.println(String("Tests complete: ") + numPassed + String(" passed, ") + numFailed + String(" failed."));
+  Serial.println();
+}
+
+
+// **********************************************************************************
+// Tests
+// **********************************************************************************
+
+bool test_broadcast_and_promiscuous_mode(String& failureReason) {
   while (!radio.receiveDone()) delay(1);
   getMessage(data, datalen);
-  if (radio.ACKRequested()) radio.sendACK(radio.SENDERID);
-  Serial.println();
 
-  // test_receive
-  Serial.println("----- test_receive -----");
+  char* response = new char[datalen];
+  for (uint8_t i = 0; i < datalen; i++) {
+    response[i] = data[datalen - i - 1];
+  }
+  Serial.println("Replying with '" + bufferToString(response, datalen) + "' (length " + String(datalen, DEC) + ")...");
+  delay(100);
+  radio.send(47, response, datalen);
+
+  return true;
+}
+
+bool test_transmit(String& failureReason) {
+  bool result = false;
+  while (!radio.receiveDone()) delay(1);
+  getMessage(data, datalen);
+  if (radio.ACKRequested()) {
+    radio.sendACK(radio.SENDERID);
+    char goal_string[6] = {'B', 'a', 'n', 'a', 'n', 'a'};
+    if (datalen >= sizeof(goal_string)) {
+      if (strncmp(data, goal_string, 6) == 0) {
+        return true;
+      } else {
+        failureReason = String("Received string '") + String(data) + String("' is not identical to '") + String(goal_string) + String("'");
+      }
+    } else {
+      failureReason = String("Failed! Datalen should have been ") + sizeof("Banana") + String(" but was ") + String(datalen);
+    }
+  }
+
+  return false;
+}
+
+bool test_receive(String& failureReason) {
   char test_message[] = "Apple";
-  delay(1000);
-  Serial.print(String("Sending test message '") + test_message + String("' of size ") + String(sizeof(test_message), DEC) + String("..."));
-  success = radio.sendWithRetry(1, test_message, sizeof(test_message), 0);
-  Serial.println(success ? "Success!" : "Failed");
-  Serial.println();
+  Serial.println(String("Sending test message '") + test_message + String("' of size ") + String(sizeof(test_message), DEC) + String("..."));
+  bool result = radio.sendWithRetry(1, test_message, sizeof(test_message), 5, 1000);
+  if (result) {
+    return true;
+  } else {
+    failureReason = String("No ack to our message");
+  }
 
-  // test_txrx
-  Serial.println("----- test_txrx -----");
+  return false;
+}
+
+bool test_txrx(String& failureReason) {
   while (!radio.receiveDone()) delay(1);
   getMessage(data, datalen);
   if (radio.ACKRequested()) radio.sendACK(radio.SENDERID);
@@ -103,15 +177,18 @@ void loop() {
   for (uint8_t i = 0; i < datalen; i++) {
     response[i] = data[datalen - i - 1];
   }
-  Serial.print("Replying with '" + bufferToString(response, datalen) + "' (length " + String(datalen, DEC) + ")...");
-  success = radio.sendWithRetry(1, response, datalen, 0);
-  Serial.println(success ? "Success!" : "Failed");
+  Serial.println("Replying with '" + bufferToString(response, datalen) + "' (length " + String(datalen, DEC) + ")...");
+  delay(100);
+  bool result = radio.sendWithRetry(1, response, datalen, 5, 1000);
+  if (!result) {
+    failureReason = String("No ack to our message");
+  }
   delete response;
-  Serial.println();
 
-#if defined(RF69_LISTENMODE_ENABLE)
-  // test_listenModeSendBurst
-  Serial.println("----- test_listenModeSendBurst -----");
+  return result;
+}
+
+bool test_listenModeSendBurst(String& failureReason) {
   Serial.println("Entering listen mode and going to sleep");
   Serial.flush();
   radio.listenModeStart();
@@ -119,23 +196,40 @@ void loop() {
   LowPower.powerDown(SLEEP_FOREVER, ADC_OFF, BOD_OFF);
   if (radio.DATALEN > 0) burst_time_remaining = radio.RF69_LISTEN_BURST_REMAINING_MS;
   getMessage(data, datalen);
-  radio.listenModeEnd();
+  Serial.println(String("Powering down for ") + burst_time_remaining + String("msec"));
   Serial.flush();
-  delay(1000);
   LowPower.longPowerDown(burst_time_remaining);
-  response = new char[datalen];
+  radio.listenModeEnd();
+  char* response = new char[datalen];
   for (uint8_t i = 0; i < datalen; i++) {
     response[i] = data[datalen - i - 1];
   }
-  Serial.print("Replying with '" + bufferToString(response, datalen) + "' (length " + String(datalen, DEC) + ")...");
-  success = radio.sendWithRetry(1, response, datalen, 0);
-  Serial.println(success ? "Success!" : "Failed");
+  if (use_encryption) radio.encrypt("sampleEncryptKey");
+  delay(10);
+  Serial.println("Replying with '" + bufferToString(response, datalen) + "' (length " + String(datalen, DEC) + ")...");
+  bool result = radio.sendWithRetry(1, response, datalen, 5, 1000);
+  if (!result) {
+    failureReason = String("No ack to our message");
+  }
   delete response;
-  Serial.println();
-#endif
 
-  Serial.println("Tests complete");
+  return result;
+}
+
+// **********************************************************************************
+// Utility functions
+// **********************************************************************************
+bool runTest(String testName, bool (*test)(String&), uint32_t delayTime) {
+  Serial.println(String("----- ") + testName + String(" -----"));
+  if (delayTime > 0) Serial.println(String("Waiting ") + delayTime / 1000.0 + String(" seconds before continuing..."));
+  delay(delayTime);
+  String failureReason = String();
+  bool result = test(failureReason);
+  if (!result) {
+    Serial.println(String("Failed! ") + failureReason);
+  }
   Serial.println();
+  return result;
 }
 
 

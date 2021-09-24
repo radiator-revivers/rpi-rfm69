@@ -1,12 +1,22 @@
+# pylint: disable=missing-function-docstring,redefined-outer-name
+
 import asyncio
 from aiohttp import ClientSession
 from RFM69 import Radio, FREQ_433MHZ
 
+async def call_API(url, packet):
+    async with ClientSession() as session:
+        print("Sending packet to server")
+        async with session.post(url, json=packet.to_dict('%c')) as response:
+            response = await response.read()
+            print("Server responded", response)
+
 async def receiver(radio):
-    while True:    
+    while True:
         print("Receiver")
         for packet in radio.get_packets():
             print("Packet received", packet.to_dict())
+            await call_API("http://httpbin.org/post", packet)
         await asyncio.sleep(10)
 
 async def send(radio, to, message):
@@ -15,7 +25,7 @@ async def send(radio, to, message):
         print ("Acknowledgement received")
     else:
         print ("No Acknowledgement")
-    
+
 async def pinger(radio):
     print("Pinger")
     counter = 0
