@@ -16,5 +16,6 @@ Part of these instructions are cribbed from [https://packaging.python.org/tutori
 1. Upload the new packages to pypi by doing ```python3 -m twine upload -u __token__ dist/*``` and entering your API token
 1. Create a new tag for the release, using the contents of [```../CHANGELOG.md```](../CHANGELOG.md) as the description of the release, and uploading the files from ```dist``` as the binaries
 1. Make sure the documentation for the latest release builds again at [https://readthedocs.org/projects/rpi-rfm69/builds/](https://readthedocs.org/projects/rpi-rfm69/builds/)
+1. Upload the coverage for the main branch using the instructions at [```../tests/readme.md```](../tests/readme.md)
 
 To clean up the build, just do ```source clean.sh```.
