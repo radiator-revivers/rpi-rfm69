@@ -174,14 +174,14 @@ bool test_receive(String& failureReason) {
 bool test_txrx(String& failureReason) {
   while (!radio.receiveDone()) delay(1);
   getMessage(data, datalen);
-  delay(100);
+  delay(200);
   if (radio.ACKRequested()) radio.sendACK(radio.SENDERID);
   char* response = new char[datalen];
   for (uint8_t i = 0; i < datalen; i++) {
     response[i] = data[datalen - i - 1];
   }
+  delay(500);
   Serial.println("Replying with '" + bufferToString(response, datalen) + "' (length " + String(datalen, DEC) + ")...");
-  delay(100);
   bool result = radio.sendWithRetry(1, response, datalen, 5, 1000);
   if (!result) {
     failureReason = String("No ack to our message");
