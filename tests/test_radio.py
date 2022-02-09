@@ -35,7 +35,7 @@ def test_receive():
 
 def do_txrx_test(radio):
     test_message = [random.randint(0, 255) for i in range(RF69_MAX_DATA_LEN)]
-    success = radio.send(2, test_message, attempts=10, waitTime=500)
+    success = radio.send(2, test_message, attempts=5, waitTime=100)
     assert success is True
     timeout = time.time() + 5
     while (not radio.has_received_packet()) and (time.time() < timeout):
@@ -43,6 +43,7 @@ def do_txrx_test(radio):
     assert radio.has_received_packet()
     packets = radio.get_packets()
     assert packets[0].data == list(reversed(test_message))
+    time.sleep(1.0)
 
 def test_txrx():
     with Radio(FREQUENCY, 1, 100, verbose=True, interruptPin=INTERRUPT_PIN, resetPin=RESET_PIN, spiDevice=SPI_DEVICE, isHighPower=IS_HIGH_POWER, encryptionKey="sampleEncryptKey") as radio:
