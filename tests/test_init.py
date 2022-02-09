@@ -27,7 +27,7 @@ def test_frequency_in_Hz():
                              FREQ_868MHZ: 868000000,
                              FREQ_915MHZ: 915000000}
         radio.set_frequency_in_Hz(frequencies_to_Hz[FREQUENCY])
-        assert radio.get_frequency_in_Hz == frequencies_in_Hz[FREQUENCY]
+        assert radio.get_frequency_in_Hz() == frequencies_in_Hz[FREQUENCY]
 
 def test_init_bad_interupt():
     with pytest.raises(ValueError) as _:

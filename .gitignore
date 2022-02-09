@@ -21,3 +21,4 @@ docs/build
 # Virtual environment files
 venv_build/
 venv_test/
+venv/
