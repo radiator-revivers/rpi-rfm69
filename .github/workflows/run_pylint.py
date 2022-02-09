@@ -1,6 +1,9 @@
 import sys
 from glob import glob
 from pylint.lint import Run
+import pylint
+
+print("Running pylint version {}".format(pylint.__version__))
 
 # Define thresholds: <3=red, <6=orange <8=yellow <9.5=green <10=brightgreen
 thresholds = {3: 'red',
