@@ -92,6 +92,8 @@ void loop() {
   RUN_TEST(test_transmit, 0);
   RUN_TEST(test_receive, 1000);
   RUN_TEST(test_txrx, 0);
+  // We run test_txrx again since we're going to try using BCM pin numbers on the Rapsberry Pi
+  RUN_TEST(test_txrx, 0);
 #if defined(RF69_LISTENMODE_ENABLE)
   RUN_TEST(test_listenModeSendBurst, 0);
 #endif
@@ -172,6 +174,7 @@ bool test_receive(String& failureReason) {
 bool test_txrx(String& failureReason) {
   while (!radio.receiveDone()) delay(1);
   getMessage(data, datalen);
+  delay(100);
   if (radio.ACKRequested()) radio.sendACK(radio.SENDERID);
   char* response = new char[datalen];
   for (uint8_t i = 0; i < datalen; i++) {
@@ -188,6 +191,7 @@ bool test_txrx(String& failureReason) {
   return result;
 }
 
+#if defined(RF69_LISTENMODE_ENABLE)
 bool test_listenModeSendBurst(String& failureReason) {
   Serial.println("Entering listen mode and going to sleep");
   Serial.flush();
@@ -215,6 +219,7 @@ bool test_listenModeSendBurst(String& failureReason) {
 
   return result;
 }
+#endif
 
 // **********************************************************************************
 // Utility functions

@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.5.0
+- Added set_frequency_in_Hz and get_frequency_in_Hz
+
 ## 0.4.0
 - Made the Radio class threadsafe, and added threadsafe methods for accessing packets
 - Added testing for the threadsafe methods

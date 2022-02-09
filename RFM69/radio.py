@@ -157,6 +157,25 @@ class Radio:
         self._writeReg(REG_FRFMID, FRF >> 8)
         self._writeReg(REG_FRFLSB, FRF)
 
+    def set_frequency_in_Hz(self, frequency_in_Hz): # pragma: no cover
+        """Set the radio frequency in Hertz
+
+        Args:
+            frequency_in_Hz (int): Value between 315000000 to 915000000 Hz.
+
+        """
+        step = 61.03515625
+        freq = int(round(frequency_in_Hz / step))
+        self._writeReg(REG_FRFMSB, freq >> 16)
+        self._writeReg(REG_FRFMID, freq >> 8)
+        self._writeReg(REG_FRFLSB, freq)
+
+    def get_frequency_in_Hz(self):
+        """Get the radio frequency in Hertz"""
+        step = 61.03515625
+        freq = (self._readReg(REG_FRFMSB) << 16) + (self._readReg(REG_FRFMID) << 8) + self._readReg(REG_FRFLSB)
+        return int(round(freq * step))
+
     def sleep(self):
         """Put the radio into sleep mode"""
         self._setMode(RF69_MODE_SLEEP)
@@ -616,14 +635,14 @@ class Radio:
     # ListenMode functions
     #
 
-    def _reinitRadio(self):
+    def _reinitRadio(self): # pragma: no cover
         self._initialize(self._freqBand, self.address, self._networkID)
         if self._encryptKey:
             self._encrypt(self._encryptKey) # Restore the encryption key if necessary
         if self._isHighSpeed:
             self._writeReg(REG_LNA, (self._readReg(REG_LNA) & ~0x3) | RF_LNA_GAINSELECT_AUTO)
 
-    def _getUsForResolution(self, resolution):
+    def _getUsForResolution(self, resolution): # pragma: no cover
         if resolution == RF_LISTEN1_RESOL_RX_64 or resolution == RF_LISTEN1_RESOL_IDLE_64:
             return 64
         elif resolution == RF_LISTEN1_RESOL_RX_4100 or resolution == RF_LISTEN1_RESOL_IDLE_4100:
@@ -633,7 +652,7 @@ class Radio:
 
         return 0 # pragma: no cover
 
-    def _getCoefForResolution(self, resolution, duration):
+    def _getCoefForResolution(self, resolution, duration): # pragma: no cover
         resolDuration = self._getUsForResolution(resolution)
         result = int(duration / resolDuration)
         # If the next-higher coefficient is closer, use that
@@ -641,7 +660,7 @@ class Radio:
             return result + 1
         return result
 
-    def _chooseResolutionAndCoef(self, resolutions, duration):
+    def _chooseResolutionAndCoef(self, resolutions, duration): # pragma: no cover
         for resolution in resolutions:
             coef = self._getCoefForResolution(resolution, duration)
             if coef <= 255:
@@ -651,7 +670,7 @@ class Radio:
         # out of range
         return (None, None)
 
-    def listen_mode_set_durations(self, rxDuration, idleDuration):
+    def listen_mode_set_durations(self, rxDuration, idleDuration): # pragma: no cover
         """Set the duty cycle for listen mode
 
         The values used may be slightly different to accomodate what
@@ -687,12 +706,12 @@ class Radio:
         self._listenCycleDurationUs = rxDuration + idleDuration
         return (rxDuration, idleDuration)
 
-    def listen_mode_get_durations(self):
+    def listen_mode_get_durations(self): # pragma: no cover
         rxDuration = self._getUsForResolution(self._rxListenResolution) * self._rxListenCoef
         idleDuration = self._getUsForResolution(self._idleListenResolution) * self._idleListenCoef
         return (rxDuration, idleDuration)
 
-    def _listenModeApplyHighSpeedSettings(self):
+    def _listenModeApplyHighSpeedSettings(self): # pragma: no cover
         if not self._isHighSpeed:
             return
         self._writeReg(REG_BITRATEMSB, RF_BITRATEMSB_200000)
@@ -702,7 +721,7 @@ class Radio:
         self._writeReg(REG_RXBW, RF_RXBW_DCCFREQ_000 | RF_RXBW_MANT_20 | RF_RXBW_EXP_0)
 
 
-    def listen_mode_send_burst(self, toAddress, buff):
+    def listen_mode_send_burst(self, toAddress, buff): # pragma: no cover
         """Send a message to nodes in listen mode as a burst
 
         Args:
