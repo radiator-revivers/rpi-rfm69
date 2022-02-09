@@ -20,6 +20,15 @@ def test_init_success():
     radio = Radio(FREQUENCY, 1, interruptPin=INTERRUPT_PIN, resetPin=RESET_PIN, spiDevice=SPI_DEVICE)
     assert isinstance(radio, Radio)
 
+def test_frequency_in_Hz():
+    with Radio(FREQUENCY, 1, 100, verbose=True, interruptPin=INTERRUPT_PIN, resetPin=RESET_PIN, spiDevice=SPI_DEVICE, isHighPower=IS_HIGH_POWER, encryptionKey="sampleEncryptKey") as radio:
+        frequencies_to_Hz = {FREQ_315MHZ: 315000000,
+                             FREQ_433MHZ: 433000000,
+                             FREQ_868MHZ: 868000000,
+                             FREQ_915MHZ: 915000000}
+        radio.set_frequency_in_Hz(frequencies_to_Hz[FREQUENCY])
+        assert radio.get_frequency_in_Hz == frequencies_in_Hz[FREQUENCY]
+
 def test_init_bad_interupt():
     with pytest.raises(ValueError) as _:
         Radio(FREQUENCY, 1, interruptPin=0, resetPin=RESET_PIN, spiDevice=SPI_DEVICE)

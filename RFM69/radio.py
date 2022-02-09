@@ -170,7 +170,8 @@ class Radio:
         self._writeReg(REG_FRFMID, freq >> 8)
         self._writeReg(REG_FRFLSB, freq)
 
-    def getFrequency_in_Hz(self):
+    def get_frequency_in_Hz(self):
+        """Get the radio frequency in Hertz"""
         step = 61.03515625
         freq = (self._readReg(REG_FRFMSB) << 16) + (self._readReg(REG_FRFMID) << 8) + self._readReg(REG_FRFLSB)
         return int(round(freq * step))
