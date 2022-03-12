@@ -31,11 +31,11 @@ def test_frequency_in_Hz():
 
 def test_init_bad_interupt():
     with pytest.raises(ValueError) as _:
-        Radio(FREQUENCY, 1, interruptPin=0, resetPin=RESET_PIN, spiDevice=SPI_DEVICE)
+        Radio(FREQUENCY, 1, interruptPin=-1, resetPin=RESET_PIN, spiDevice=SPI_DEVICE)
 
 def test_init_bad_reset():
     with pytest.raises(ValueError) as _:
-        Radio(FREQUENCY, 1, resetPin=0, interruptPin=INTERRUPT_PIN, spiDevice=SPI_DEVICE)
+        Radio(FREQUENCY, 1, resetPin=-1, interruptPin=INTERRUPT_PIN, spiDevice=SPI_DEVICE)
 
 def test_init_bad_spi_bus():
     with pytest.raises(IOError) as _:
