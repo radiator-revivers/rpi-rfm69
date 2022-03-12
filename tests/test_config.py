@@ -6,7 +6,7 @@ from RFM69 import FREQ_315MHZ, FREQ_433MHZ, FREQ_868MHZ, FREQ_915MHZ
 # FREQUENCY     = FREQ_315MHZ
 # FREQUENCY     = FREQ_433MHZ
 # FREQUENCY     = FREQ_868MHZ
-# FREQUENCY     = FREQ_915MHZ
+FREQUENCY     = FREQ_915MHZ
 
 
 # Defaults
@@ -16,11 +16,10 @@ from RFM69 import FREQ_315MHZ, FREQ_433MHZ, FREQ_868MHZ, FREQ_915MHZ
 # IS_HIGH_POWER = True
 
 # Adafruit RFM69HCW Transceiver Radio Bonnet https://www.adafruit.com/product/4072
-# INTERRUPT_PIN = 15
-# RESET_PIN     = 22
-# SPI_DEVICE    = 1
-# IS_HIGH_POWER = True
-
+INTERRUPT_PIN = 15
+RESET_PIN     = 22
+SPI_DEVICE    = 1
+IS_HIGH_POWER = True
 
 # RaspyRFM http://www.seegel-systeme.de/2015/09/02/ein-funkmodul-fuer-den-raspberry-raspyrfm/
 # Module #1 (Single / 1st module on twin/quattro)
