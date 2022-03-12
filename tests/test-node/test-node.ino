@@ -174,7 +174,7 @@ bool test_receive(String& failureReason) {
 bool test_txrx(String& failureReason) {
   while (!radio.receiveDone()) delay(1);
   getMessage(data, datalen);
-  delay(200);
+  delay(25);
   if (radio.ACKRequested()) radio.sendACK(radio.SENDERID);
   char* response = new char[datalen];
   for (uint8_t i = 0; i < datalen; i++) {

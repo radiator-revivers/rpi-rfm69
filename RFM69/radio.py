@@ -101,7 +101,8 @@ class Radio:
         else:
             GPIO.setmode(GPIO.BCM)
         GPIO.setup(self.intPin, GPIO.IN)
-        GPIO.setup(self.rstPin, GPIO.OUT)
+        if self.rstPin:
+            GPIO.setup(self.rstPin, GPIO.OUT)
 
     def _init_spi(self):
         #initialize SPI
@@ -110,11 +111,12 @@ class Radio:
         self.spi.max_speed_hz = 4000000
 
     def _reset_radio(self):
-        # Hard reset the RFM module
-        GPIO.output(self.rstPin, GPIO.HIGH)
-        time.sleep(0.3)
-        GPIO.output(self.rstPin, GPIO.LOW)
-        time.sleep(0.3)
+        if self.rstPin:
+            # Hard reset the RFM module
+            GPIO.output(self.rstPin, GPIO.HIGH)
+            time.sleep(0.3)
+            GPIO.output(self.rstPin, GPIO.LOW)
+            time.sleep(0.3)
         #verify chip is syncing?
         start = time.time()
         while self._readReg(REG_SYNCVALUE1) != 0xAA: # pragma: no cover

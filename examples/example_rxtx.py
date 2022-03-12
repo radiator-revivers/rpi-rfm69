@@ -10,8 +10,17 @@ recipient_id = 2
 # The following are for an Adafruit RFM69HCW Transceiver Radio
 # Bonnet https://www.adafruit.com/product/4072
 # You should adjust them to whatever matches your radio
-with Radio(FREQ_915MHZ, node_id, network_id, isHighPower=True, verbose=False,
-           interruptPin=15, resetPin=22, spiDevice=1) as radio:
+board = {'isHighPower': True, 'interruptPin': 15, 'resetPin': 22, 'spiDevice': 1}
+
+# The following are for an RaspyRFM RFM69CW Module #1
+# http://www.seegel-systeme.de/2015/09/02/ein-funkmodul-fuer-den-raspberry-raspyrfm/
+# board = {'isHighPower': False, 'interruptPin': 22, 'resetPin': None, 'spiDevice': 0}
+
+# The following are for an RaspyRFM RFM69CW Module #2
+# http://www.seegel-systeme.de/2015/09/02/ein-funkmodul-fuer-den-raspberry-raspyrfm/
+# board = {'isHighPower': False, 'interruptPin': 18, 'resetPin': None, 'spiDevice': 1}
+
+with Radio(FREQ_915MHZ, node_id, network_id, verbose=False, **board) as radio:
     print ("Starting loop...")
 
     while True:

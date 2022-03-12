@@ -21,5 +21,20 @@ from RFM69 import FREQ_315MHZ, FREQ_433MHZ, FREQ_868MHZ, FREQ_915MHZ
 # SPI_DEVICE    = 1
 # IS_HIGH_POWER = True
 
+
+# RaspyRFM http://www.seegel-systeme.de/2015/09/02/ein-funkmodul-fuer-den-raspberry-raspyrfm/
+# Module #1 (Single / 1st module on twin/quattro)
+# INTERRUPT_PIN = 22
+# RESET_PIN     = None
+# SPI_DEVICE    = 0
+# IS_HIGH_POWER = False
+
+# RaspyRFM http://www.seegel-systeme.de/2015/09/02/ein-funkmodul-fuer-den-raspberry-raspyrfm/
+# Module #2 (2nd module on twin)
+# INTERRUPT_PIN = 18
+# RESET_PIN     = None
+# SPI_DEVICE    = 1
+# IS_HIGH_POWER = False
+
 # Uncomment to test ListenMode
 # TEST_LISTEN_MODE_SEND_BURST = True
