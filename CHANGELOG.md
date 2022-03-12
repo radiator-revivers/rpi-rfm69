@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.5.1
+- Added support for radios without reset pins
+
 ## 0.5.0
 - Added set_frequency_in_Hz and get_frequency_in_Hz
 
