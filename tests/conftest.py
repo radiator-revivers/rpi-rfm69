@@ -19,3 +19,92 @@ for _name in ("spidev", "RPi", "RPi.GPIO"):
 
 # Make ``RPi.GPIO`` reachable as an attribute of ``RPi`` (import machinery expects it).
 sys.modules["RPi"].GPIO = sys.modules["RPi.GPIO"]
+
+# --- Mocked-SPI Radio harness (phase 02) --------------------------------------
+# The upstream tests/test_radio*.py build a real ``Radio`` and busy-wait on
+# hardware, so they only run on-Pi. To exercise ``_sendFrame`` / ``_interruptHandler``
+# host-side we build a ``Radio`` via ``__new__`` + attribute injection (no ``__init__``,
+# no SPI/GPIO) and drive it through a small ``FakeSpiDev`` double.
+import threading  # noqa: E402  pylint: disable=wrong-import-position
+
+import pytest  # noqa: E402  pylint: disable=wrong-import-position
+
+from RFM69.radio import Radio  # noqa: E402  pylint: disable=wrong-import-position
+from RFM69.header import pack_header  # noqa: E402  pylint: disable=wrong-import-position
+from RFM69.registers import REG_FIFO, RF69_MODE_RX  # noqa: E402  pylint: disable=wrong-import-position
+
+
+class FakeSpiDev:
+    """Minimal SpiDev test double.
+
+    - Records every write (address byte has bit 7 set) in ``writes`` for TX
+      assertions.
+    - Serves FIFO reads (address byte == ``REG_FIFO & 0x7f`` == 0) by popping
+      successive bytes from a primed ``rx_fifo`` stream — mirroring how the real
+      chip pops the FIFO on each burst read.
+    - Returns a benign ``0xFF`` for every other register read, so the driver's
+      ``MODEREADY`` / ``PAYLOADREADY`` / ``PACKETSENT`` mask-checks fall through
+      immediately (never busy-waits) and ``REG_RSSIVALUE`` yields a real int.
+    """
+
+    def __init__(self):
+        self.writes = []
+        self.rx_fifo = b""
+        self._cursor = 0
+
+    def prime(self, data):
+        self.rx_fifo = bytes(data)
+        self._cursor = 0
+
+    def _xfer(self, data):
+        first = data[0]
+        if first & 0x80:                        # register / FIFO write
+            self.writes.append(list(data))
+            return [0] * len(data)
+        if first == (REG_FIFO & 0x7f):          # FIFO read: pop from the stream
+            n = len(data) - 1
+            chunk = self.rx_fifo[self._cursor:self._cursor + n]
+            self._cursor += n
+            return [0] + list(chunk) + [0] * (n - len(chunk))
+        return [0] + [0xFF] * (len(data) - 1)   # plain register read
+
+    xfer = _xfer
+    xfer2 = _xfer
+
+
+@pytest.fixture
+def radio():
+    """A hardware-free ``Radio``: ``__new__`` + only the attributes that
+    ``_sendFrame`` / ``_interruptHandler`` (and the helpers they call) touch."""
+    r = Radio.__new__(Radio)
+    r.spi = FakeSpiDev()
+    r.address = 300                 # 10-bit id -> exercises the high-bit path
+    r.isRFM69HW = False
+    r.promiscuousMode = 0
+    r.enableATC = False
+    r.enableRSSIack = False
+    r.auto_acknowledge = True
+    r.lastRSSI = 0
+    r.logger = None
+    r._packets = []
+    r.acks = {}
+    r.mode = RF69_MODE_RX
+    r._spiLock = threading.Lock()
+    r._intLock = threading.Lock()
+    r._sendLock = threading.Condition()
+    r._ackLock = threading.Condition()
+    r._packetLock = threading.Condition()
+    r._modeLock = threading.RLock()
+    return r
+
+
+@pytest.fixture
+def prime():
+    """Return a helper that stages an RX frame in the radio's fake FIFO."""
+    def _prime(radio, target, sender, payload, **flags):  # pylint: disable=redefined-outer-name
+        radio.spi.prime(
+            bytes([len(payload) + 3])
+            + pack_header(target, sender, **flags)
+            + bytes(payload)
+        )
+    return _prime

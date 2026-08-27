@@ -11,19 +11,22 @@ class Packet:
         sender (int): Node ID of sender
         RSSI (int): Received Signal Strength Indicator i.e. the power present in a received radio signal
         data (list): Raw transmitted data
+        ack_requested (bool): Whether the sender requested an acknowledgement (CTL 0x40)
 
     """
 
     # Declare slots to reduce memory
-    __slots__ = 'received', 'received_epoch', 'receiver', 'sender', 'RSSI', 'data'
+    __slots__ = ('received', 'received_epoch', 'receiver', 'sender', 'RSSI',
+                 'data', 'ack_requested')
 
-    def __init__(self, receiver, sender, RSSI, data):
+    def __init__(self, receiver, sender, RSSI, data, ack_requested=False):
         self.received = datetime.utcnow()
         self.received_epoch = int(time.time()*1000)
         self.receiver = receiver
         self.sender = sender
         self.RSSI = RSSI
         self.data = data
+        self.ack_requested = ack_requested
 
     def to_dict(self, dateFormat=None):
         """Returns a dictionary representation of the class data"""
@@ -32,7 +35,8 @@ class Packet:
         else:
             return_date = datetime.strftime(self.received, dateFormat)
         return dict(received=return_date, receiver=self.receiver,
-                    sender=self.sender, rssi=self.RSSI, data=self.data)
+                    sender=self.sender, rssi=self.RSSI, data=self.data,
+                    ack_requested=self.ack_requested)
 
     @property
     def data_string(self):

@@ -10,6 +10,7 @@ import RPi.GPIO as GPIO # pylint: disable=consider-using-from-import
 from .registers import *
 from .packet import Packet
 from .config import get_config
+from .header import pack_header, parse_header
 
 
 class Radio:
@@ -535,18 +536,14 @@ class Radio:
         if len(buff) > RF69_MAX_DATA_LEN:
             buff = buff[0:RF69_MAX_DATA_LEN]
 
-        ack = 0
-        if sendACK:
-            ack = 0x80
-            if self.enableATC:
-                ack |= 0x20
-        elif requestACK:
-            ack = 0x40
+        header = pack_header(toAddress, self.address, request_ack=requestACK,
+                             send_ack=sendACK,
+                             rssi_request=(sendACK and self.enableATC))
         with self._spiLock:
             if isinstance(buff, str):
                 buff = [int(ord(i)) for i in list(buff)]
 
-            self.spi.xfer2([REG_FIFO | 0x80, len(buff) + 3, toAddress, self.address, ack] + buff)
+            self.spi.xfer2([REG_FIFO | 0x80, len(buff) + 3] + list(header) + buff)
 
         with self._sendLock:
             self._setMode(RF69_MODE_TX)
@@ -662,6 +659,10 @@ class Radio:
 
                 payload_length = min(payload_length, 66)
 
+                hdr = parse_header(bytes([target_id, sender_id, CTLbyte]))
+                target_id = hdr.target
+                sender_id = hdr.sender
+
                 if not (self.promiscuousMode or target_id == self.address or target_id == RF69_BROADCAST_ADDR):
                     self._debug("Ignore Interrupt")
                     self._intLock.release()
@@ -669,8 +670,9 @@ class Radio:
                     return
 
                 data_length = payload_length - 3
-                ack_received = bool(CTLbyte & 0x80)
-                ack_requested = bool(CTLbyte & 0x40) and target_id == self.address # Only send back an ack if we're the intended recipient
+                ack_received = hdr.ack_received
+                ack_requested = hdr.ack_requested and target_id == self.address # Only send back an ack if we're the intended recipient
+                rssi_requested = hdr.rssi_requested
                 with self._spiLock:
                     data = self.spi.xfer2([REG_FIFO & 0x7f] + [0 for i in range(0, data_length)])[1:]
                 self.lastRSSI = self._readRSSI()
@@ -694,14 +696,16 @@ class Radio:
                     # )
                     with self._packetLock:
                         self._packets.append(
-                            Packet(int(target_id), int(sender_id), int(self.lastRSSI), list(data))
+                            Packet(int(target_id), int(sender_id), int(self.lastRSSI),
+                                   list(data), ack_requested=ack_requested)
                         )
                         self._packetLock.notify_all()
 
                 # if ack_requested by sender node and auto_acknowledge enabled, ack has to be sent
                 if ack_requested and self.auto_acknowledge:
-                    # if RSSI ack enabled a special ACK message is sent back
-                    if self.enableRSSIack:
+                    # reactive RSSI-echo: the sender asked for it (CTL 0x20), or the
+                    # global override forces it. Reply with a special RSSI ACK.
+                    if rssi_requested or self.enableRSSIack:
                         self._debug("Sending an RSSI ack")
                         rssi_back =  list(struct.pack('B', abs(self.lastRSSI)))
                         self._intLock.release()
