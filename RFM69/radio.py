@@ -328,6 +328,39 @@ class Radio:
 
         return False
 
+    def send_and_get_reply(self, toAddress, buff="", wait=200, attempts=3):
+        """Send a message and return the payload the node returns in its radio ACK.
+
+        A request/reply primitive for protocols (e.g. WirelessHEX69 OTA) where the
+        node answers *inside* its ACK payload via LowPowerLab ``sendACK(reply, len)``.
+        ``send()`` only reports whether an ACK arrived; this surfaces the bytes the
+        ACK carried (retained by ``_interruptHandler``). Additive — ``send()`` /
+        ``broadcast()`` keep their bool/None contract.
+
+        Args:
+            toAddress (int): Recipient node's ID
+            buff (str): Message buffer to send
+
+        Keyword Args:
+            wait (int): Milliseconds to wait for the ACK on each attempt. Default 200
+                is modest for a request/reply exchange; the OTA caller will tune it.
+            attempts (int): Number of send attempts. Default 3.
+
+        Returns:
+            list | None: The ACK payload bytes the node returned, or ``None`` if no
+            ACK arrived within ``wait`` ms across ``attempts`` tries.
+        """
+        for _ in range(0, attempts):
+            self._send(toAddress, buff, True)
+            with self._ackLock:
+                # Presence-only predicate: do NOT reuse _ACKReceived here — it pops the
+                # entry and returns True, discarding the payload T1 retained, so the pop
+                # below would return None even on success. Wait on key presence, then pop
+                # the value ourselves to capture the reply before removing it.
+                if self._ackLock.wait_for(lambda: toAddress in self.acks, wait / 1000):
+                    return self.acks.pop(toAddress, None)
+        return None
+
     def read_temperature(self, calFactor=0):
         """Read the temperature of the radios CMOS chip.
 
@@ -679,9 +712,15 @@ class Radio:
 
                 if ack_received:
                     self._debug("Incoming ack from {}".format(sender_id))
-                    # Record acknowledgement
+                    # Record acknowledgement, retaining the ACK's payload bytes so a
+                    # request/reply caller (e.g. WirelessHEX69 OTA, which answers via
+                    # LowPowerLab sendACK) can read the node's reply. _ACKReceived still
+                    # keys on presence, so send()'s bool contract is unchanged; an
+                    # empty-payload ACK stores [] (a present key). Direct assignment is
+                    # latest-wins for a same-node re-ACK, correct for one-outstanding-
+                    # exchange flows (_ACKReceived is the only reader, checks presence).
                     with self._ackLock:
-                        self.acks.setdefault(sender_id, 1)
+                        self.acks[sender_id] = list(data)
                         self._ackLock.notify_all()
                 elif ack_requested:
                     self._debug("replying to ack request")
