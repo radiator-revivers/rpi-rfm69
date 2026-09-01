@@ -51,6 +51,11 @@ class FakeSpiDev:
         self.writes = []
         self.rx_fifo = b""
         self._cursor = 0
+        # Per-register read overrides (keyed by the 7-bit register address).
+        # Read-based accessors (bitrate, fdev, version, CRC/AES/sync flags) need
+        # *specific* register values; anything not primed still reads 0xFF so the
+        # MODEREADY / PAYLOADREADY / PACKETSENT mask-checks keep falling through.
+        self.reg_values = {}
 
     def prime(self, data):
         self.rx_fifo = bytes(data)
@@ -66,7 +71,8 @@ class FakeSpiDev:
             chunk = self.rx_fifo[self._cursor:self._cursor + n]
             self._cursor += n
             return [0] + list(chunk) + [0] * (n - len(chunk))
-        return [0] + [0xFF] * (len(data) - 1)   # plain register read
+        # plain register read: serve a primed value if we have one, else 0xFF
+        return [0] + [self.reg_values.get(first & 0x7f, 0xFF)] * (len(data) - 1)
 
     xfer = _xfer
     xfer2 = _xfer

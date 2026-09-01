@@ -22,21 +22,21 @@ with open(path.join(here, 'VERSION'), encoding='utf-8') as f:
 # Fields marked as "Optional" may be commented out.
 
 setup(
-    name='rpi-rfm69',  # Required
+    name='rpi-rfm69-rr',  # Required
     # https://packaging.python.org/en/latest/single_source_version.html
     version=version,  # Required
     # https://packaging.python.org/specifications/core-metadata/#summary
-    description='RFM69 Radio interface for the Raspberry Pi',  # Required
+    description='RFM69 Radio interface for the Raspberry Pi (10-bit-addressing / OTA fork)',  # Required
     # https://packaging.python.org/specifications/core-metadata/#description-optional
     long_description=long_description,  # Optional
     # https://packaging.python.org/specifications/core-metadata/#description-content-type-optional
     long_description_content_type='text/markdown',  # Optional (see note above)
     # https://packaging.python.org/specifications/core-metadata/#home-page-optional
-    url='https://github.com/jgillula/rpi-rfm69',  # Optional
+    url='https://github.com/akstudios/rpi-rfm69',  # Optional
     # This should be your name or the name of the organization which owns the project
-    author='Jeremy Gillula',  # Optional
+    author='Ajmal Ali',  # Optional
     # This should be a valid email address corresponding to the author listed above.
-    author_email='jgillula+rfm69rpi@gmail.com',  # Optional
+    author_email='ajmal@akstudios.com',  # Optional
     # Classifiers help users find your project by categorizing it.
     # https://pypi.python.org/pypi?%3Aaction=list_classifiers
     classifiers=[  # Optional

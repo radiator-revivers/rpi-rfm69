@@ -1103,6 +1103,12 @@ RF69_CSMA_LIMIT_S = 1
 
 powerLevel = 31
 
+# Crystal oscillator frequency (Hz) and frequency synthesizer step (Hz):
+# FXOSC = 32 MHz, FSTEP = FXOSC / 2^19 (datasheet p13). Used by the bitrate /
+# frequency-deviation accessors ported from LowPowerLab RFM69 v1.6.0.
+FXOSC = 32000000
+FSTEP = 61.03515625
+
 
 # ListenMode Constants
 DEFAULT_LISTEN_RX_US = 256

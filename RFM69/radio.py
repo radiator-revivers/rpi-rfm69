@@ -223,7 +223,22 @@ class Radio:
         # self.powerLevel = int(round(31 * (percent / 100)))
         # self._writeReg(REG_PALEVEL, (self._readReg(REG_PALEVEL) & 0xE0) | self.powerLevel)
 
-        powerLevel_new = int(round(31 * (percent / 100)))
+        # Map the 0-100 percentage onto the raw 0-31 level and defer to the raw
+        # port; the external contract (percent in, same REG_PALEVEL out) is
+        # unchanged.
+        self.set_power_level_raw(int(round(31 * (percent / 100))))
+
+    def set_power_level_raw(self, level):
+        """Set the transmit power from a raw level (LowPowerLab ``setPowerLevel(uint8_t)``).
+
+        Args:
+            level (int): Raw power level. For RFM69 W/CW this is 0-31; for HW/HCW
+                the meaningful range is 0-23 (values are clamped as upstream does).
+
+        Unlike :meth:`set_power_level` this takes the *raw* level, not a percent -
+        it is the primitive the dBm path (:meth:`set_power_dbm`) delegates to.
+        """
+        powerLevel_new = level
         if self.isRFM69HW:
             if powerLevel_new > 23:
                 powerLevel_new = 23
@@ -251,6 +266,45 @@ class Radio:
 
          # write value to REG_PALEVEL
         self._writeReg(REG_PALEVEL, PA_SETTING | powerLevel_new)
+
+    def set_power_dbm(self, dbm):
+        """Set the TX output power in dBm (LowPowerLab ``setPowerDBm``).
+
+        Ranges: [-2..+20] dBm for RFM69 HW/HCW, [-18..+13] dBm for W/CW.
+
+        Args:
+            dbm (int): Desired output power in dBm (clamped to the module's range).
+
+        Returns:
+            int: The (possibly clamped) dBm value actually applied.
+        """
+        if self.isRFM69HW:
+            # HW/HCW: clamp to hardware range then map dBm -> raw level exactly as
+            # upstream setPowerDBm does (via the raw path, NOT the percent path).
+            if dbm < -2:
+                dbm = -2
+            elif dbm > 20:
+                dbm = 20
+            if dbm < 17:
+                self.set_power_level_raw(2 + dbm)
+            else:
+                self.set_power_level_raw(3 + dbm)
+        else:
+            # W/CW: register value already equals the level; upstream only clamps
+            # here and writes nothing.
+            if dbm < -18:
+                dbm = -18
+            elif dbm > 13:
+                dbm = 13
+        return dbm
+
+    def get_power_level(self):
+        """Return the stored raw power level (LowPowerLab ``getPowerLevel``).
+
+        Returns:
+            int: The raw power level last set (0-31).
+        """
+        return self.powerLevel
 
     # for RFM69 HW/HCW only switching off over current protection
     def set_HighPower(self, _isRFM69HW_HCW):
@@ -399,6 +453,147 @@ class Radio:
             results.append([str(hex(address)), str(bin(self._readReg(address)))])
         return results
 
+    def read_registers_compact(self):
+        """Read registers 0x01-0x7F as a structured dump.
+
+        Python analog of LowPowerLab ``readAllRegsCompact``. The Arduino version
+        prints a serial grid; here we return the raw data so a caller can format
+        it however they like. :meth:`read_registers` is left untouched.
+
+        Returns:
+            dict: Mapping of register address (int, 0x01-0x7F) to its byte value.
+        """
+        return {addr: self._readReg(addr) for addr in range(0x01, 0x80)}
+
+    def set_lna(self, new_reg):
+        """Set the LNA gain-select bits (LowPowerLab ``setLNA``).
+
+        Overwrites only the low 3 gain-select bits of REG_LNA, preserving the
+        rest. Disabling the AGC via a manual gain lets you attenuate the input to
+        simulate receiver "distance" from a transmitter.
+
+        Args:
+            new_reg (int): New LNA setting; only the low 3 bits are used.
+
+        Returns:
+            int: The previous REG_LNA value (so the caller can restore it).
+        """
+        old_reg = self._readReg(REG_LNA)
+        self._writeReg(REG_LNA, (new_reg & 7) | (old_reg & ~7))
+        return old_reg  # return the original value in case we need to restore it
+
+    def spy_mode(self, on_off=True):
+        """Enable/disable spy (promiscuous) mode (LowPowerLab ``spyMode``).
+
+        When on, ID filtering is off so every packet on the network is captured
+        regardless of TARGETID. Aliases the existing ``promiscuousMode`` flag; the
+        REG_PACKETCONFIG1 write is commented out upstream (filtering is already
+        off in this config) so none is issued here.
+
+        Args:
+            on_off (bool): True to capture all packets, False to filter.
+        """
+        self.promiscuousMode = on_off
+
+    def get_spy_mode(self):
+        """Return whether spy (promiscuous) mode is on (LowPowerLab ``getSpyMode``).
+
+        Returns:
+            bool: True if capturing all packets regardless of TARGETID.
+        """
+        return bool(self.promiscuousMode)
+
+    def get_version(self):
+        """Return the radio silicon version register (LowPowerLab ``getVersion``).
+
+        Returns:
+            int: REG_VERSION value.
+        """
+        return self._readReg(REG_VERSION)
+
+    def get_address(self):
+        """Return this node's (10-bit) address (LowPowerLab ``getAddress``).
+
+        Returns:
+            int: The full node address.
+        """
+        return self.address
+
+    def get_network(self):
+        """Return the network ID (LowPowerLab ``getNetwork``).
+
+        Returns:
+            int: The network ID.
+        """
+        return self._networkID
+
+    def get_bitrate(self):
+        """Return the on-air bitrate in bps (LowPowerLab ``getBitRate``).
+
+        Returns:
+            int: Bitrate in bits per second, computed as FXOSC / bitrate-register.
+        """
+        return FXOSC // ((self._readReg(REG_BITRATEMSB) << 8) | self._readReg(REG_BITRATELSB))
+
+    def get_frequency_deviation(self):
+        """Return the frequency deviation in Hz (LowPowerLab ``getFrequencyDeviation``).
+
+        Returns:
+            int: Frequency deviation in Hz, computed as FSTEP * fdev-register.
+        """
+        return int(FSTEP * ((self._readReg(REG_FDEVMSB) << 8) | self._readReg(REG_FDEVLSB)))
+
+    def is_crc_on(self):
+        """Return whether CRC is enabled (LowPowerLab ``isCrcOn``).
+
+        Returns:
+            bool: True if the CRC-on bit of REG_PACKETCONFIG1 is set.
+        """
+        return bool(self._readReg(REG_PACKETCONFIG1) & RF_PACKET1_CRC_ON)
+
+    def is_aes_on(self):
+        """Return whether AES encryption is enabled (LowPowerLab ``isAesOn``).
+
+        Returns:
+            bool: True if the AES-on bit of REG_PACKETCONFIG2 is set.
+        """
+        return bool(self._readReg(REG_PACKETCONFIG2) & RF_PACKET2_AES_ON)
+
+    def is_sync_on(self):
+        """Return whether sync-word detection is enabled (LowPowerLab ``isSyncOn``).
+
+        Returns:
+            bool: True if the sync-on bit of REG_SYNCCONFIG is set.
+        """
+        return bool(self._readReg(REG_SYNCCONFIG) & RF_SYNC_ON)
+
+    def is_high_power(self):
+        """Return whether this is a high-power (HW/HCW) radio (LowPowerLab ``isHighPower``).
+
+        Returns:
+            bool: True for RFM69HW/HCW.
+        """
+        return self.isRFM69HW
+
+    def get_output_power(self):
+        """Return the raw REG_PALEVEL output-power bits (LowPowerLab ``getOutputPower``).
+
+        Returns:
+            int: The low 5 bits (0-31) of REG_PALEVEL.
+        """
+        return self._readReg(REG_PALEVEL) & 0x1F
+
+    def dbm_to_mw(self, dbm):
+        """Convert dBm to milliwatts (LowPowerLab ``dBm_to_mW``).
+
+        Args:
+            dbm (int): Power in dBm.
+
+        Returns:
+            float: Power in milliwatts, ``10 ** (dbm / 10)``.
+        """
+        return 10 ** (dbm / 10.0)
+
     def begin_receive(self):
         """Begin listening for packets"""
         with self._intLock:
@@ -539,7 +734,10 @@ class Radio:
 
     def _setAddress(self, addr):
         self.address = addr
-        self._writeReg(REG_NODEADRS, self.address)
+        # REG_NODEADRS is an 8-bit register and is unused here (ID filtering is
+        # off in this config), but a 10-bit address would overflow the SPI byte -
+        # mask to the low 8 bits so a >255 id never reaches the wire.
+        self._writeReg(REG_NODEADRS, addr & 0xFF)
 
     def _canSend(self):
         if self.mode == RF69_MODE_STANDBY: # pylint: disable=no-else-return
@@ -776,7 +974,7 @@ class Radio:
         if self._encryptKey:
             self._encrypt(self._encryptKey) # Restore the encryption key if necessary
         if self._isHighSpeed:
-            self._writeReg(REG_LNA, (self._readReg(REG_LNA) & ~0x3) | RF_LNA_GAINSELECT_AUTO)
+            self.set_lna(RF_LNA_GAINSELECT_AUTO)
 
     # pylint: disable=no-else-return
     def _getUsForResolution(self, resolution): # pragma: no cover
