@@ -90,6 +90,14 @@ def radio():
     r.enableATC = False
     r.enableRSSIack = False
     r.auto_acknowledge = True
+    # ATC auto-power members (phase 04d). The fixture bypasses __init__, so these
+    # must be primed by hand. powerLevel is set by direct attribute (NOT via
+    # set_power_level_raw) so it records no REG_PALEVEL write and the "no write"
+    # convergence assertions hold.
+    r._targetRSSI = 0
+    r._ackRSSI = 0
+    r._transmitLevelStep = 1
+    r.powerLevel = 31
     r.lastRSSI = 0
     r.logger = None
     r._packets = []

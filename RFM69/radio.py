@@ -58,6 +58,13 @@ class Radio:
         self.powerLevel = 31
         self.enableRSSIack = kwargs.get('rssiACK', False)
 
+        # ATC closed-loop auto-power, sender half (LowPowerLab RFM69_ATC). Kept
+        # independent of enableATC (the responder echo flag): _targetRSSI == 0
+        # means auto-power is off. Both on == a fully-ATC node.
+        self._targetRSSI = 0
+        self._ackRSSI = 0
+        self._transmitLevelStep = 1
+
         self.lastRSSI = 0
 
         # Thread-safe locks
@@ -305,6 +312,53 @@ class Radio:
             int: The raw power level last set (0-31).
         """
         return self.powerLevel
+
+    def enable_auto_power(self, target_rssi=-90):
+        """Enable ATC closed-loop auto-power (LowPowerLab ``enableAutoPower``).
+
+        Sets the target RSSI the receiver should see; after each ack-requested
+        exchange the transmit power steps toward it (see
+        :meth:`_update_ack_rssi_and_power`). This is the *sender* half of ATC and
+        is independent of ``enableATC`` (the responder RSSI-echo). A fully-ATC
+        node runs both. ``target_rssi == 0`` disables auto-power.
+
+        Args:
+            target_rssi (int): Desired RSSI at the receiver in dBm (default -90).
+        """
+        self._targetRSSI = target_rssi
+
+    def get_target_rssi(self):
+        """Return the ATC auto-power target RSSI (LowPowerLab ``getTargetRssi``)."""
+        return self._targetRSSI
+
+    def get_ack_rssi(self):
+        """Return the last echoed ACK RSSI (LowPowerLab ``getAckRSSI``).
+
+        Returns ``0`` while auto-power is off (``_targetRSSI == 0``), else the
+        RSSI captured from the most recent RSSI-echo ACK.
+        """
+        return 0 if self._targetRSSI == 0 else self._ackRSSI
+
+    def _update_ack_rssi_and_power(self, rssi_byte):
+        """Capture an echoed ACK RSSI and step transmit power toward the target.
+
+        Faithful to the LowPowerLab ``RFM69_ATC::interruptHook`` convergence
+        decision, extracted into a plain method so the golden vectors can drive
+        it without the hardware ISR. ``rssi_byte`` is the receiver's echoed
+        ``abs(rssi)``; stored as a negative dBm. Power moves via
+        :meth:`set_power_level_raw` so ``REG_PALEVEL`` and ``powerLevel`` stay
+        consistent (that setter also backstops the HW clamp to 23).
+
+        Args:
+            rssi_byte (int): First payload byte of the RSSI-echo ACK.
+        """
+        self._ackRSSI = -1 * rssi_byte
+        if self._targetRSSI != 0:
+            maxLevel = 23 if self.isRFM69HW else 31
+            if self._ackRSSI < self._targetRSSI and self.powerLevel < maxLevel:
+                self.set_power_level_raw(self.powerLevel + self._transmitLevelStep)
+            elif self._ackRSSI > self._targetRSSI and self.powerLevel > 0:
+                self.set_power_level_raw(self.powerLevel - 1)
 
     # for RFM69 HW/HCW only switching off over current protection
     def set_HighPower(self, _isRFM69HW_HCW):
@@ -769,7 +823,8 @@ class Radio:
 
         header = pack_header(toAddress, self.address, request_ack=requestACK,
                              send_ack=sendACK,
-                             rssi_request=(sendACK and self.enableATC))
+                             rssi_request=((sendACK and self.enableATC)
+                                           or (requestACK and self._targetRSSI != 0)))
         with self._spiLock:
             if isinstance(buff, str):
                 buff = [int(ord(i)) for i in list(buff)]
@@ -920,6 +975,11 @@ class Radio:
                     with self._ackLock:
                         self.acks[sender_id] = list(data)
                         self._ackLock.notify_all()
+                    # ATC initiator: if we requested the RSSI echo (CTL 0x20) and
+                    # the ACK carries a payload, the first byte is the receiver's
+                    # abs(rssi) - step our transmit power toward _targetRSSI.
+                    if rssi_requested and len(data) >= 1:
+                        self._update_ack_rssi_and_power(data[0])
                 elif ack_requested:
                     self._debug("replying to ack request")
                 else:

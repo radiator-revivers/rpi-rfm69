@@ -18,6 +18,13 @@ and Listen-Mode RX (04e) follow on hardware.
   `get_frequency_deviation`, `is_crc_on`, `is_aes_on`, `is_sync_on`,
   `is_high_power`, `get_output_power`, `dbm_to_mw`.
 
+### Added (04d - ATC closed-loop auto-power, TX side)
+- ATC auto-power sender half (port of `RFM69_ATC`): `enable_auto_power(target_rssi)`,
+  `get_ack_rssi()`, `get_target_rssi()`. An ack-requested send now sets the RSSI-echo
+  request bit (CTL `0x20`) whenever a target is set, and transmit power converges
+  toward the target from the RSSI the receiver echoes back in the ACK. Independent of
+  `enableATC` (the responder echo shipped in phase 02); a fully-ATC node runs both.
+
 ### Changed
 - `_setAddress` masks `REG_NODEADRS` to 8 bits so a 10-bit node id never
   overflows the SPI byte; `self.address` still holds the full 10-bit id.

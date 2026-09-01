@@ -10,6 +10,7 @@ discipline as ``test_radio_codec.py``. No hardware is touched.
 import pytest
 
 from RFM69.registers import (
+    REG_FIFO,
     REG_PALEVEL, REG_LNA, REG_NODEADRS, REG_VERSION,
     REG_BITRATEMSB, REG_BITRATELSB, REG_FDEVMSB, REG_FDEVLSB,
     REG_PACKETCONFIG1, REG_PACKETCONFIG2, REG_SYNCCONFIG,
@@ -193,3 +194,101 @@ def test_setaddress_masks_reg_nodeadrs_but_keeps_full_address(radio):
     radio._setAddress(500)
     assert _last_write(radio.spi, REG_NODEADRS) == (500 & 0xFF)   # 0xF4
     assert radio.address == 500
+
+
+# --- 04d: ATC closed-loop auto-power (TX side) --------------------------------
+# CTL bits (header.py): 0x40 REQACK, 0x20 RSSI-request (RFM69_CTL_RESERVE1).
+CTL_REQACK = 0x40
+CTL_RSSI_REQUEST = 0x20
+
+
+def _fifo_ctl(spi):
+    """CTL byte (index 4) of the recorded FIFO burst-write.
+
+    Layout: ``[REG_FIFO|0x80, len+3, target, sender, CTL, ...payload]``.
+    """
+    for w in spi.writes:
+        if w[0] == (REG_FIFO | 0x80):
+            return w[4]
+    raise AssertionError("no FIFO burst-write was recorded")
+
+
+def test_enable_auto_power_sets_target_and_ack_rssi_gating(radio):
+    # get_ack_rssi is 0 while auto-power is off, even if _ackRSSI holds a value.
+    radio._ackRSSI = -55
+    assert radio.get_ack_rssi() == 0
+    radio.enable_auto_power(-80)
+    assert radio.get_target_rssi() == -80
+    # With a target set, get_ack_rssi returns the captured echo.
+    radio._update_ack_rssi_and_power(75)             # abs(rssi)=75 -> -75 dBm
+    assert radio.get_ack_rssi() == -75
+
+
+def test_default_target_rssi_is_zero_before_enable(radio):
+    assert radio.get_target_rssi() == 0
+    assert radio.get_ack_rssi() == 0
+
+
+# AC-2: drive the REAL send path and read the recorded CTL byte (a pack_header-
+# only assertion would pass without the radio.py _sendFrame edit).
+def test_ack_requested_send_sets_rssi_request_bit_when_auto_power_on(radio):
+    radio.enable_auto_power(-70)
+    radio._sendFrame(100, [1, 2, 3], True, False)    # requestACK=True, sendACK=False
+    ctl = _fifo_ctl(radio.spi)
+    assert ctl & CTL_REQACK == CTL_REQACK            # still an ack request
+    assert ctl & CTL_RSSI_REQUEST == CTL_RSSI_REQUEST  # + RSSI echo requested
+
+
+def test_ack_requested_send_leaves_rssi_bit_clear_when_auto_power_off(radio):
+    # Regression pin: _targetRSSI == 0 -> requestACK frame byte-identical to today.
+    assert radio._targetRSSI == 0
+    radio._sendFrame(100, [1, 2, 3], True, False)
+    ctl = _fifo_ctl(radio.spi)
+    assert ctl & CTL_REQACK == CTL_REQACK
+    assert ctl & CTL_RSSI_REQUEST == 0
+
+
+# AC-3: convergence table driven through the extracted decision method.
+# (isRFM69HW, powerLevel, target, rssi_byte, exp_level, exp_palevel, exp_ack_rssi)
+CONVERGENCE_VECTORS = [
+    # weak echo below target, below max -> +step (W/CW: REG_PALEVEL = PA0_ON|level)
+    (False, 10, -70, 90, 11, RF_PALEVEL_PA0_ON | 11, -90),
+    # strong echo above target, above 0 -> -1
+    (False, 10, -70, 50, 9, RF_PALEVEL_PA0_ON | 9, -50),
+    # at W/CW max (31), weak echo -> no increase, no write
+    (False, 31, -70, 90, 31, None, -90),
+    # at HW max (23), weak echo -> no increase, no write
+    (True, 23, -70, 90, 23, None, -90),
+    # at 0, strong echo -> no decrease, no write
+    (False, 0, -70, 50, 0, None, -50),
+    # exact match -> no change, no write
+    (False, 10, -70, 70, 10, None, -70),
+    # HW weak echo below max -> +step (HW: level 11 < 16 -> +16, PA1_ON)
+    (True, 10, -70, 90, 11, RF_PALEVEL_PA1_ON | (11 + 16), -90),
+]
+
+
+@pytest.mark.parametrize(
+    "is_hw,power,target,rssi_byte,exp_level,exp_palevel,exp_ack", CONVERGENCE_VECTORS)
+def test_update_ack_rssi_and_power_steps_like_upstream(
+        radio, is_hw, power, target, rssi_byte, exp_level, exp_palevel, exp_ack):
+    radio.isRFM69HW = is_hw
+    radio.powerLevel = power                          # direct: no spurious write
+    radio._targetRSSI = target
+    radio._update_ack_rssi_and_power(rssi_byte)
+    assert radio.powerLevel == exp_level
+    assert radio.get_power_level() == exp_level
+    assert _last_write(radio.spi, REG_PALEVEL) == exp_palevel
+    assert radio.get_ack_rssi() == exp_ack
+
+
+def test_update_ack_rssi_and_power_target_zero_captures_but_no_step(radio):
+    # target == 0: _ackRSSI is captured internally but no step, no write, and the
+    # accessor still reports 0 (ATC off).
+    radio.isRFM69HW = False
+    radio.powerLevel = 10
+    radio._targetRSSI = 0
+    radio._update_ack_rssi_and_power(90)
+    assert radio.powerLevel == 10
+    assert _last_write(radio.spi, REG_PALEVEL) is None
+    assert radio.get_ack_rssi() == 0
